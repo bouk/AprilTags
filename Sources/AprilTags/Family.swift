@@ -21,7 +21,7 @@ public class Family {
         destroy(tf)
     }
 
-    var name: String {
+    public var name: String {
         String(cString: tf.pointee.name)
     }
 
