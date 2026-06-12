@@ -65,6 +65,12 @@ final class DetectorSettings: ObservableObject {
         didSet { defaults.set(selectedFormatID, forKey: Keys.selectedFormatID) }
     }
 
+    /// Selected still-capture size id (`CaptureFormat.id`); `nil` uses the
+    /// largest (full sensor resolution).
+    @Published var selectedPhotoSizeID: String? {
+        didSet { defaults.set(selectedPhotoSizeID, forKey: Keys.selectedPhotoSizeID) }
+    }
+
     private let defaults = UserDefaults.standard
 
     init() {
@@ -87,6 +93,7 @@ final class DetectorSettings: ObservableObject {
         deglitch = defaults.object(forKey: Keys.deglitch) as? Bool ?? d.deglitch
         showFPS = defaults.object(forKey: Keys.showFPS) as? Bool ?? true
         selectedFormatID = defaults.string(forKey: Keys.selectedFormatID)
+        selectedPhotoSizeID = defaults.string(forKey: Keys.selectedPhotoSizeID)
     }
 
     var config: DetectorConfig {
@@ -140,6 +147,7 @@ final class DetectorSettings: ObservableObject {
         static let families = "families"
         static let showFPS = "showFPS"
         static let selectedFormatID = "selectedFormatID"
+        static let selectedPhotoSizeID = "selectedPhotoSizeID"
         static let minClusterPixels = "minClusterPixels"
         static let maxNumMaxima = "maxNumMaxima"
         static let criticalAngleDegrees = "criticalAngleDegrees"

@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// Root view. The camera lives on the first page; swiping to the left reveals
-/// the settings page (a horizontally paged `TabView`).
+/// the settings page (a horizontally paged `TabView`). Tapping the camera
+/// captures a full-resolution still and presents the result screen.
 struct ContentView: View {
     @StateObject private var settings = DetectorSettings()
     @StateObject private var camera = CameraManager()
@@ -11,16 +12,25 @@ struct ContentView: View {
 
     var body: some View {
         TabView(selection: $page) {
-            CameraScreen(camera: camera, showFPS: settings.showFPS)
-                .tag(Page.camera)
+            CameraScreen(camera: camera, showFPS: settings.showFPS) {
+                camera.capturePhoto(config: settings.config)
+            }
+            .tag(Page.camera)
 
             SettingsScreen(settings: settings, camera: camera)
                 .tag(Page.settings)
         }
         .tabViewStyle(.page(indexDisplayMode: .never))
+        .fullScreenCover(item: $camera.capturedFrame) { captured in
+            ResultScreen(settings: settings, camera: camera, captured: captured) {
+                camera.dismissCapture()
+            }
+            .preferredColorScheme(.dark)
+        }
         .onAppear {
             camera.update(config: settings.config)
             camera.selectFormat(id: settings.selectedFormatID)
+            camera.selectPhotoSize(id: settings.selectedPhotoSizeID)
             camera.start()
         }
         .onChange(of: page) { _, newPage in
@@ -28,6 +38,7 @@ struct ContentView: View {
             if newPage == .camera {
                 camera.update(config: settings.config)
                 camera.selectFormat(id: settings.selectedFormatID)
+                camera.selectPhotoSize(id: settings.selectedPhotoSizeID)
                 settings.persist()
             }
         }

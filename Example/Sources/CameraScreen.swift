@@ -1,19 +1,26 @@
 import SwiftUI
 
 /// Shows the live grayscale camera frame with detected tags outlined and their
-/// IDs drawn on top.
+/// IDs drawn on top. Tapping anywhere captures a full-resolution still.
 struct CameraScreen: View {
     @ObservedObject var camera: CameraManager
     var showFPS: Bool
+    var onCapture: () -> Void
 
     var body: some View {
         ZStack(alignment: .top) {
             // The camera frame bleeds full-screen, behind the status bar.
             cameraLayer
                 .ignoresSafeArea()
+                .contentShape(Rectangle())
+                .onTapGesture { onCapture() }
 
             // The header stays within the top safe area.
             header
+
+            if camera.isCapturing {
+                capturingOverlay
+            }
         }
     }
 
@@ -23,14 +30,14 @@ struct CameraScreen: View {
                 Color.black
 
                 if let frame = camera.frame {
-                    let rect = fittedRect(content: camera.imageSize, in: geo.size)
+                    let rect = aspectFittedRect(content: camera.imageSize, in: geo.size)
 
                     Image(decorative: frame, scale: 1, orientation: .up)
                         .resizable()
                         .frame(width: rect.width, height: rect.height)
                         .position(x: rect.midX, y: rect.midY)
 
-                    DetectionOverlay(detections: camera.detections, imageSize: camera.imageSize)
+                    DetectionView(detections: camera.detections, imageSize: camera.imageSize)
                         .frame(width: rect.width, height: rect.height)
                         .position(x: rect.midX, y: rect.midY)
                 }
@@ -61,6 +68,16 @@ struct CameraScreen: View {
         .background(.ultraThinMaterial)
     }
 
+    private var capturingOverlay: some View {
+        ProgressView("Capturing…")
+            .progressViewStyle(.circular)
+            .padding(24)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(.black.opacity(0.25))
+            .ignoresSafeArea()
+    }
+
     private var permissionMessage: some View {
         VStack(spacing: 12) {
             Image(systemName: "camera.fill")
@@ -73,69 +90,5 @@ struct CameraScreen: View {
                 .foregroundStyle(.secondary)
         }
         .padding(32)
-    }
-
-    /// Aspect-fits `content` inside `container`, centered.
-    private func fittedRect(content: CGSize, in container: CGSize) -> CGRect {
-        guard content.width > 0, content.height > 0 else {
-            return CGRect(origin: .zero, size: container)
-        }
-        let scale = min(container.width / content.width, container.height / content.height)
-        let size = CGSize(width: content.width * scale, height: content.height * scale)
-        return CGRect(
-            x: (container.width - size.width) / 2,
-            y: (container.height - size.height) / 2,
-            width: size.width,
-            height: size.height
-        )
-    }
-}
-
-/// Draws tag outlines and IDs. Its own bounds match the displayed image, so it
-/// only needs to scale image-pixel coordinates to its local space.
-private struct DetectionOverlay: View {
-    let detections: [TagDetection]
-    let imageSize: CGSize
-
-    var body: some View {
-        Canvas { context, size in
-            guard imageSize.width > 0, imageSize.height > 0 else { return }
-            let sx = size.width / imageSize.width
-            let sy = size.height / imageSize.height
-            let map = { (p: CGPoint) in CGPoint(x: p.x * sx, y: p.y * sy) }
-
-            for detection in detections {
-                let points = detection.corners.map(map)
-                guard points.count == 4 else { continue }
-
-                var path = Path()
-                path.move(to: points[0])
-                for point in points.dropFirst() {
-                    path.addLine(to: point)
-                }
-                path.closeSubpath()
-                context.stroke(path, with: .color(.green), lineWidth: 3)
-
-                let center = map(detection.center)
-                let label = Text("\(detection.tagID)")
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
-                let resolved = context.resolve(label)
-                let textSize = resolved.measure(in: size)
-                let padding = CGSize(width: 12, height: 6)
-                let bgRect = CGRect(
-                    x: center.x - textSize.width / 2 - padding.width / 2,
-                    y: center.y - textSize.height / 2 - padding.height / 2,
-                    width: textSize.width + padding.width,
-                    height: textSize.height + padding.height
-                )
-                context.fill(
-                    Path(roundedRect: bgRect, cornerRadius: 6),
-                    with: .color(.green.opacity(0.85))
-                )
-                context.draw(resolved, at: center)
-            }
-        }
-        .allowsHitTesting(false)
     }
 }

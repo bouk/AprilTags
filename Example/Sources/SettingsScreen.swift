@@ -17,9 +17,24 @@ struct SettingsScreen: View {
                     }
                     .pickerStyle(.navigationLink)
                 } header: {
-                    Text("Camera")
+                    Text("Live feed")
                 } footer: {
                     Text("Higher resolutions and frame rates depend on the device. Detection must keep up to reach the chosen rate.")
+                }
+
+                if !photoSizes.isEmpty {
+                    Section {
+                        Picker("Photo size", selection: photoSizeSelection) {
+                            ForEach(photoSizes) { format in
+                                Text(format.label).tag(format.id)
+                            }
+                        }
+                        .pickerStyle(.navigationLink)
+                    } header: {
+                        Text("Capture")
+                    } footer: {
+                        Text("Tap the live view to capture a still at this resolution, then tune detection against the frozen image. Larger sizes give the detector more detail to work with via quad decimate.")
+                    }
                 }
 
                 Section {
@@ -96,12 +111,41 @@ struct SettingsScreen: View {
         }
     }
 
+    /// The live format the picker currently reflects (selected, or the active
+    /// one until the user chooses).
+    private var effectiveFormatID: String {
+        settings.selectedFormatID ?? camera.activeFormatID ?? ""
+    }
+
+    /// Still sizes the currently selected live format can capture.
+    private var photoSizes: [CaptureFormat] {
+        camera.photoSizesByFormatID[effectiveFormatID] ?? []
+    }
+
     /// Reflects the user's choice, falling back to the camera's active format
-    /// when nothing has been explicitly selected yet.
+    /// when nothing has been explicitly selected yet. Switching the live format
+    /// re-defaults the photo size to that format's largest still.
     private var formatSelection: Binding<String> {
         Binding(
-            get: { settings.selectedFormatID ?? camera.activeFormatID ?? "" },
-            set: { settings.selectedFormatID = $0 }
+            get: { effectiveFormatID },
+            set: { newID in
+                settings.selectedFormatID = newID
+                settings.selectedPhotoSizeID = camera.photoSizesByFormatID[newID]?.last?.id
+            }
+        )
+    }
+
+    /// Reflects the chosen still size, defaulting to the largest the selected
+    /// live format supports when the saved choice no longer applies.
+    private var photoSizeSelection: Binding<String> {
+        Binding(
+            get: {
+                if let id = settings.selectedPhotoSizeID, photoSizes.contains(where: { $0.id == id }) {
+                    return id
+                }
+                return photoSizes.last?.id ?? ""
+            },
+            set: { settings.selectedPhotoSizeID = $0 }
         )
     }
 
